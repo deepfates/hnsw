@@ -1,8 +1,8 @@
-import { HNSW, HNSWWithPersistence } from '../src';
+import { HNSW, HNSWWithDB } from '../src';
 
 async function main(): Promise<{ id: number; score: number }[]> {
   // Simple example
-  const hnsw = new HNSW(200, 16);
+  const hnsw = new HNSW(200, 16, 5, 'cosine');
 
   // Make some data
   const data = [
@@ -38,7 +38,7 @@ async function main(): Promise<{ id: number; score: number }[]> {
 test('HNSW', async () => {
   const results = await main();
   expect(results).toEqual([
-    { id: 1, score: 130 },
-    { id: 2, score: 170 },
+    { id: 1, score: 0.9649505047327671 },
+    { id: 2, score: 0.9864400504156211 },
   ]);
 });
