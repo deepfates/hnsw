@@ -1,0 +1,23 @@
+{
+  "name": "hnsw",
+  "version": "1.0.0",
+  "description": "A TypeScript implementation of HNSW (Hierarchical Navigable Small World) algorithm for approximate nearest neighbor search",
+  "main": "dist/hnsw.js",
+  "types": "dist/hnsw.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublish": "tsc"
+  },
+  "keywords": [
+    "nearest neighbor",
+    "vector search"
+  ],
+  "author": "deepfates",
+  "license": "MIT",
+  "dependencies": {
+    "idb": "^7.1.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.4"
+  }
+}
