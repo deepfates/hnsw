@@ -1,6 +1,6 @@
 {
   "name": "hnsw",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A TypeScript implementation of HNSW (Hierarchical Navigable Small World) algorithm for approximate nearest neighbor search",
   "main": "dist/hnsw.js",
   "types": "dist/hnsw.d.ts",
