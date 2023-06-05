@@ -1,9 +1,9 @@
 {
-  "name": "hnsw",
-  "version": "1.0.1",
+  "name": "hnsw.js",
+  "version": "1.0.2",
   "description": "A TypeScript implementation of HNSW (Hierarchical Navigable Small World) algorithm for approximate nearest neighbor search",
-  "main": "dist/hnsw.js",
-  "types": "dist/hnsw.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest --config jestconfig.json",
     "build": "tsc",
