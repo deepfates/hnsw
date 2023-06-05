@@ -42,7 +42,7 @@ console.log(results);
 
 Persistent index using IndexedDB:
 ```typescript
-import { HNSWWithPersistence } from 'hnsw';
+import { HNSWWithDB } from 'hnsw';
 
 // With persistence
 const index = await HNSWWithPersistence.create(200, 16, 'my-index');

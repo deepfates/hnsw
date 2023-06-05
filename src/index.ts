@@ -1,2 +1,2 @@
-export { HNSW } from './hnsw';
+export { HNSW } from './main';
 export { HNSWWithDB } from './db';

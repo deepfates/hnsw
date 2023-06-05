@@ -1,4 +1,4 @@
-import { HNSW } from './hnsw';
+import { HNSW } from './main';
 import { openDB, deleteDB, DBSchema, IDBPDatabase } from 'idb';
 
 interface HNSWDB extends DBSchema {
