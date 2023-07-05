@@ -45,7 +45,7 @@ Persistent index using IndexedDB:
 import { HNSWWithDB } from 'hnsw';
 
 // With persistence
-const index = await HNSWWithPersistence.create(200, 16, 'my-index');
+const index = await HNSWWithDB.create(200, 16, 'my-index');
 
 // Make some data
 const data = [
@@ -61,7 +61,7 @@ await index.buildIndex(data);
 await index.saveIndex();
 
 // Load the index
-const index2 = await HNSWWithPersistence.create(200, 16, 'my-index-2');
+const index2 = await HNSWWithDB.create(200, 16, 'my-index-2');
 await index2.loadIndex();
 
 // Search for nearest neighbors
