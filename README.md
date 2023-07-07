@@ -21,7 +21,7 @@ Ephemeral index in-memory:
 import { HNSW } from '../src/hnsw';
 
 // Simple example
-const hnsw = new HNSW(200, 16, 'cosine');
+const hnsw = new HNSW(200, 16, 5, 'cosine');
 
 // Make some data
 const data = [
