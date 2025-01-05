@@ -128,6 +128,13 @@ export class HNSW {
   }
 
   searchKNN(query: Float32Array | number[], k: number): { id: number; score: number }[] {
+    // Check if there's only one node in the graph
+    if (this.nodes.size === 1) {
+      const onlyNode = this.nodes.get(this.entryPointId)!;
+      const similarity = this.similarityFunction(onlyNode.vector, query);
+      return [{ id: this.entryPointId, score: similarity }];
+    }
+
     const result: { id: number; score: number }[] = [];
     const visited: Set<number> = new Set<number>();
 
