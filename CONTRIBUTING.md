@@ -39,4 +39,40 @@ Thanks for taking the time to improve this HNSW implementation. The checklist be
 - Re-run `npm test`, `npm run lint`, and `npm run build` after each revision that touches code.
 - When the PR is approved, squash or rebase as requested by the maintainer, then merge.
 
+## Releasing to npm (maintainers only)
+
+After merging a PR to `main`, follow these steps to publish a new version:
+
+### Choose the version bump
+
+Use [semantic versioning](https://semver.org/):
+- **Patch** (1.0.x): Bug fixes, no behavior changes
+- **Minor** (1.x.0): New features, algorithm improvements, backward compatible
+- **Major** (x.0.0): Breaking API changes
+
+### Publish workflow
+
+```bash
+# Make sure you're on main and up to date
+git checkout main
+git pull origin main
+
+# Run the version bump (runs lint, format, and creates a git tag)
+npm version patch   # or minor, or major
+
+# This automatically runs:
+# - preversion: npm run lint
+# - version: npm run format && git add -A src
+# - postversion: git push && git push --tags
+
+# Publish to npm (runs prepublishOnly: npm test && npm run lint)
+npm publish
+
+# If this is your first publish or you need to log in:
+npm login
+npm publish
+```
+
+The version scripts are already configured in `package.json` to handle the workflow, so `npm version` will automatically lint, format, commit, tag, and push.
+
 Following this workflow keeps the project healthy and makes it clear how each contribution was validated before landing.
