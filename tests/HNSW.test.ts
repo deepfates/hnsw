@@ -1,44 +1,93 @@
-import { HNSW, HNSWWithDB } from '../src';
+// @ts-nocheck
+import { HNSW } from '../src';
 
-async function main(): Promise<{ id: number; score: number }[]> {
-  // Simple example
-  const hnsw = new HNSW(200, 16, 5, 'cosine');
+const createSequentialData = (count, dimensions = 5) =>
+  Array.from({ length: count }, (_, index) => ({
+    id: index + 1,
+    vector: Array.from({ length: dimensions }, (_, dimIndex) => dimIndex + 1 + index),
+  }));
 
-  // Make some data
-  const data = [
-    { id: 1, vector: [1, 2, 3, 4, 5] },
-    { id: 2, vector: [2, 3, 4, 5, 6] },
-    { id: 3, vector: [3, 4, 5, 6, 7] },
-    { id: 4, vector: [4, 5, 6, 7, 8] },
-    { id: 5, vector: [5, 6, 7, 8, 9] },
-  ];
+const baseData = createSequentialData(5);
 
-  // Build the index
+const buildBasicIndex = async (
+  data = baseData,
+  {
+    levelSequence,
+    metric = 'cosine',
+    M = 16,
+    efConstruction = 200,
+  }: { levelSequence?: number[]; metric?: 'cosine' | 'euclidean'; M?: number; efConstruction?: number } = {},
+) => {
+  const hnsw = new HNSW(M, efConstruction, data[0].vector.length, metric);
+  const sequence = levelSequence ? [...levelSequence] : undefined;
+  const selectMock = sequence
+    ? jest.spyOn(hnsw as any, 'selectLevel').mockImplementation(() => (sequence!.shift() as number) ?? 0)
+    : null;
   await hnsw.buildIndex(data);
+  selectMock?.mockRestore();
+  return hnsw;
+};
 
-  // Search for nearest neighbors
-  const results = hnsw.searchKNN([6, 7, 8, 9, 10], 2);
-  console.log(results);
-  return results;
+describe('HNSW', () => {
+  it('performs a basic KNN search with deterministic ordering', async () => {
+    const levelSequence = Array(baseData.length).fill(0);
+    const hnsw = await buildBasicIndex(baseData, { levelSequence });
+    const results = hnsw.searchKNN([3, 4, 5, 6, 7], 3);
+    expect(results.map((result) => result.id)).toEqual([3, 4, 2]);
+    expect(results[0].score).toBeCloseTo(1, 5);
+  });
 
-  // // Persistence is hard to test without a real database, but here's an example
-  // const index = await HNSWWithPersistence.create(200, 16, 'my-index');
-  // await index.buildIndex(data);
-  // await index.saveIndex();
+  it('selectLevel obeys the probability distribution derived from M', () => {
+    const hnsw = new HNSW(4, 16);
+    (hnsw as any).probs = [0.5, 0.3, 0.2];
+    const mockRandom = jest.spyOn(Math, 'random');
+    mockRandom
+      .mockReturnValueOnce(0.2) // level 0
+      .mockReturnValueOnce(0.6) // level 1
+      .mockReturnValueOnce(0.95); // level 2
 
-  // // Load the index
-  // const index2 = await HNSWWithPersistence.create(200, 16, 'my-index-2');
-  // await index2.loadIndex();
+    const levels = [0, 1, 2].map(() => (hnsw as any).selectLevel());
+    expect(levels).toEqual([0, 1, 2]);
+    mockRandom.mockRestore();
+  });
 
-  // // Search for nearest neighbors
-  // const results2 = index2.searchKNN([6, 7, 8, 9, 10], 2);
-  // console.log(results2);
-}
+  it('promotes the highest-level node to the entry point', async () => {
+    const hnsw = await buildBasicIndex(baseData, { levelSequence: [0, 3, 1, 0, 2] });
+    expect((hnsw as any).entryPointId).toBe(2);
+    expect((hnsw as any).levelMax).toBe(3);
+  });
 
-test('HNSW', async () => {
-  const results = await main();
-  expect(results).toEqual([
-    { id: 1, score: 0.9649505047327671 },
-    { id: 2, score: 0.9864400504156211 },
-  ]);
+  it('keeps only the M most similar neighbors per node', async () => {
+    const linearData = [
+      { id: 1, vector: [0, 0] },
+      { id: 2, vector: [0, 1] },
+      { id: 3, vector: [0, 2] },
+      { id: 4, vector: [0, 3] },
+    ];
+
+    const hnsw = await buildBasicIndex(linearData, {
+      levelSequence: Array(linearData.length).fill(0),
+      metric: 'euclidean',
+      M: 2,
+      efConstruction: 16,
+    });
+
+    const node4 = (hnsw as any).nodes.get(4);
+    expect(node4.neighbors[0]).toEqual([3, 2]);
+
+    const node2 = (hnsw as any).nodes.get(2);
+    expect(node2.neighbors[0]).toHaveLength(2);
+    expect(node2.neighbors[0]).toEqual(expect.arrayContaining([3, 1]));
+  });
+
+  it('round-trips through JSON serialization without losing neighbors', async () => {
+    const hnsw = await buildBasicIndex();
+    const serialized = hnsw.toJSON();
+    const restored = HNSW.fromJSON(serialized);
+
+    const originalResults = hnsw.searchKNN([6, 7, 8, 9, 10], 2);
+    const restoredResults = restored.searchKNN([6, 7, 8, 9, 10], 2);
+
+    expect(restoredResults).toEqual(originalResults);
+  });
 });

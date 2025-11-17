@@ -1,8 +1,8 @@
-import { PriorityQueue } from './pqueue';
 import { Node } from './node';
 import { cosineSimilarity, euclideanSimilarity } from './similarity';
 
 type Metric = 'cosine' | 'euclidean';
+type SearchCandidate = { node: Node; score: number };
 
 export class HNSW {
   metric: Metric; // Metric to use
@@ -23,7 +23,7 @@ export class HNSW {
     this.entryPointId = -1;
     this.nodes = new Map<number, Node>();
     this.probs = this.set_probs(M, 1 / Math.log(M));
-    this.levelMax = this.probs.length - 1;
+    this.levelMax = -1;
     this.similarityFunction = this.getMetric(metric as Metric);
   }
 
@@ -51,66 +51,145 @@ export class HNSW {
 
   private selectLevel(): number {
     let r = Math.random();
-    this.probs.forEach((p, i) => {
+    for (let i = 0; i < this.probs.length; i++) {
+      const p = this.probs[i];
       if (r < p) {
         return i;
       }
       r -= p;
-    });
+    }
     return this.probs.length - 1;
+  }
+
+  private insertCandidate(list: SearchCandidate[], candidate: SearchCandidate, limit?: number) {
+    let index = 0;
+    while (index < list.length && list[index].score >= candidate.score) {
+      index++;
+    }
+    list.splice(index, 0, candidate);
+    if (typeof limit === 'number' && list.length > limit) {
+      list.length = limit;
+    }
+  }
+
+  private greedySearch(query: Float32Array | number[], entryNode: Node, level: number): Node {
+    let bestNode = entryNode;
+    let bestScore = this.similarityFunction(query, entryNode.vector);
+    let improved = true;
+
+    while (improved) {
+      improved = false;
+      const neighbors = bestNode.neighbors[level] ?? [];
+      for (const neighborId of neighbors) {
+        const neighborNode = this.nodes.get(neighborId)!;
+        const similarity = this.similarityFunction(query, neighborNode.vector);
+        if (similarity > bestScore) {
+          bestScore = similarity;
+          bestNode = neighborNode;
+          improved = true;
+        }
+      }
+    }
+
+    return bestNode;
+  }
+
+  private searchLayer(query: Float32Array | number[], entryNode: Node, level: number, ef: number): Node[] {
+    const visited = new Set<number>([entryNode.id]);
+    const queue: SearchCandidate[] = [];
+    const best: SearchCandidate[] = [];
+
+    const entryScore = this.similarityFunction(query, entryNode.vector);
+    this.insertCandidate(queue, { node: entryNode, score: entryScore });
+    this.insertCandidate(best, { node: entryNode, score: entryScore }, ef);
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const neighbors = current.node.neighbors[level] ?? [];
+      for (const neighborId of neighbors) {
+        if (visited.has(neighborId)) continue;
+        visited.add(neighborId);
+        const neighborNode = this.nodes.get(neighborId)!;
+        const score = this.similarityFunction(query, neighborNode.vector);
+        if (best.length < ef || score > best[best.length - 1].score) {
+          this.insertCandidate(queue, { node: neighborNode, score });
+          this.insertCandidate(best, { node: neighborNode, score }, ef);
+        }
+      }
+    }
+
+    return best.map((entry) => entry.node);
+  }
+
+  private connectNodeAtLevel(node: Node, candidates: Node[], level: number) {
+    const selected: Node[] = [];
+    const seen = new Set<number>();
+
+    for (const candidate of candidates) {
+      if (candidate.id === node.id || seen.has(candidate.id)) continue;
+      seen.add(candidate.id);
+      selected.push(candidate);
+      if (selected.length === this.M) {
+        break;
+      }
+    }
+
+    for (const neighbor of selected) {
+      this.addBidirectionalConnection(node, neighbor, level);
+    }
+  }
+
+  private addBidirectionalConnection(node: Node, other: Node, level: number) {
+    this.insertNeighbor(node, other.id, level);
+    this.insertNeighbor(other, node.id, level);
+  }
+
+  private insertNeighbor(node: Node, neighborId: number, level: number) {
+    if (!node.neighbors[level]) {
+      node.neighbors[level] = [];
+    }
+
+    const neighborList = node.neighbors[level].filter((id) => id !== neighborId);
+    neighborList.push(neighborId);
+    neighborList.sort((a, b) => {
+      const simB = this.similarityFunction(node.vector, this.nodes.get(b)!.vector);
+      const simA = this.similarityFunction(node.vector, this.nodes.get(a)!.vector);
+      return simB - simA;
+    });
+
+    if (neighborList.length > this.M) {
+      neighborList.length = this.M;
+    }
+
+    node.neighbors[level] = neighborList;
   }
 
   private async addNodeToGraph(node: Node) {
     if (this.entryPointId === -1) {
       this.entryPointId = node.id;
+      this.levelMax = node.level;
       return;
     }
 
-    let currentNode = this.nodes.get(this.entryPointId)!;
-    let closestNode = currentNode;
+    const currentMaxLevel = this.levelMax;
+    let entryNode = this.nodes.get(this.entryPointId)!;
 
-    for (let level = this.levelMax; level >= 0; level--) {
-      while (true) {
-        let nextNode = null;
-        let maxSimilarity = -Infinity;
+    for (let level = currentMaxLevel; level > node.level; level--) {
+      entryNode = this.greedySearch(node.vector, entryNode, level);
+    }
 
-        for (const neighborId of currentNode.neighbors[level]) {
-          if (neighborId === -1) break;
-
-          const neighborNode = this.nodes.get(neighborId)!;
-          const similarity = this.similarityFunction(node.vector, neighborNode.vector);
-          if (similarity > maxSimilarity) {
-            maxSimilarity = similarity;
-            nextNode = neighborNode;
-          }
-        }
-
-        if (nextNode && maxSimilarity > this.similarityFunction(node.vector, closestNode.vector)) {
-          currentNode = nextNode;
-          closestNode = currentNode;
-        } else {
-          break;
-        }
+    const targetLevel = Math.min(node.level, currentMaxLevel);
+    for (let level = targetLevel; level >= 0; level--) {
+      const neighbors = this.searchLayer(node.vector, entryNode, level, this.efConstruction);
+      this.connectNodeAtLevel(node, neighbors, level);
+      if (neighbors.length > 0) {
+        entryNode = neighbors[0];
       }
     }
 
-    const closestLevel = Math.min(node.level, closestNode.level);
-    for (let level = 0; level <= closestLevel; level++) {
-      // Add new neighbor to closestNode's neighbors
-      closestNode.neighbors[level] = closestNode.neighbors[level].filter((id) => id !== -1);
-      closestNode.neighbors[level].push(node.id);
-      // If the number of neighbors exceeds M, remove the farthest one
-      if (closestNode.neighbors[level].length > this.M) {
-        closestNode.neighbors[level].pop();
-      }
-
-      // Add new neighbor to node's neighbors
-      node.neighbors[level] = node.neighbors[level].filter((id) => id !== -1);
-      node.neighbors[level].push(closestNode.id);
-      // If the number of neighbors exceeds M, remove the farthest one
-      if (node.neighbors[level].length > this.M) {
-        node.neighbors[level].pop();
-      }
+    if (node.level > this.levelMax) {
+      this.entryPointId = node.id;
+      this.levelMax = node.level;
     }
   }
 
@@ -120,69 +199,44 @@ export class HNSW {
     }
     this.d = vector.length;
 
-    this.nodes.set(id, new Node(id, vector, this.selectLevel(), this.M));
+    this.nodes.set(id, new Node(id, vector, this.selectLevel()));
     const node = this.nodes.get(id)!;
-    this.levelMax = Math.max(this.levelMax, node.level);
 
     await this.addNodeToGraph(node);
   }
 
   searchKNN(query: Float32Array | number[], k: number): { id: number; score: number }[] {
-    // Check if there's only one node in the graph
-    if (this.nodes.size === 1) {
-      const onlyNode = this.nodes.get(this.entryPointId)!;
-      const similarity = this.similarityFunction(onlyNode.vector, query);
-      return [{ id: this.entryPointId, score: similarity }];
+    if (this.entryPointId === -1 || this.nodes.size === 0) {
+      return [];
     }
 
-    const result: { id: number; score: number }[] = [];
-    const visited: Set<number> = new Set<number>();
+    let entryNode = this.nodes.get(this.entryPointId)!;
+    for (let level = this.levelMax; level > 0; level--) {
+      entryNode = this.greedySearch(query, entryNode, level);
+    }
 
-    const candidates = new PriorityQueue<number>((a, b) => {
-      const aNode = this.nodes.get(a)!;
-      const bNode = this.nodes.get(b)!;
-      return this.similarityFunction(query, bNode.vector) - this.similarityFunction(query, aNode.vector);
-    });
+    const ef = Math.max(k, this.efConstruction);
+    const candidates = this.searchLayer(query, entryNode, 0, ef);
+    const results: { id: number; score: number }[] = [];
+    const seen = new Set<number>();
 
-    candidates.push(this.entryPointId);
-    let level = this.levelMax;
-
-    while (!candidates.isEmpty() && result.length < k) {
-      const currentId = candidates.pop()!;
-      if (visited.has(currentId)) continue;
-
-      visited.add(currentId);
-
-      const currentNode = this.nodes.get(currentId)!;
-      const similarity = this.similarityFunction(currentNode.vector, query);
-
-      if (similarity > 0) {
-        result.push({ id: currentId, score: similarity });
-      }
-
-      if (currentNode.level === 0) {
-        continue;
-      }
-
-      level = Math.min(level, currentNode.level - 1);
-
-      for (let i = level; i >= 0; i--) {
-        const neighbors = currentNode.neighbors[i];
-        for (const neighborId of neighbors) {
-          if (!visited.has(neighborId)) {
-            candidates.push(neighborId);
-          }
-        }
+    for (const node of candidates) {
+      if (seen.has(node.id)) continue;
+      seen.add(node.id);
+      const score = this.similarityFunction(node.vector, query);
+      results.push({ id: node.id, score });
+      if (results.length === k) {
+        break;
       }
     }
 
-    return result.slice(0, k);
+    return results;
   }
 
   async buildIndex(data: { id: number; vector: Float32Array | number[] }[]) {
     // Clear existing index
     this.nodes.clear();
-    this.levelMax = 0;
+    this.levelMax = -1;
     this.entryPointId = -1;
 
     // Add points to the index
