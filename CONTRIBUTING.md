@@ -46,6 +46,7 @@ After merging a PR to `main`, follow these steps to publish a new version:
 ### Choose the version bump
 
 Use [semantic versioning](https://semver.org/):
+
 - **Patch** (1.0.x): Bug fixes, no behavior changes
 - **Minor** (1.x.0): New features, algorithm improvements, backward compatible
 - **Major** (x.0.0): Breaking API changes
