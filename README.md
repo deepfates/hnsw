@@ -18,10 +18,10 @@ npm install hnsw
 
 Ephemeral index in-memory:
 ```typescript
-import { HNSW } from '../src/hnsw';
+import { HNSW } from 'hnsw';
 
 // Simple example
-const hnsw = new HNSW(200, 16, 5, 'cosine');
+const hnsw = new HNSW(16, 200, 5, 'cosine', 50);
 
 // Make some data
 const data = [
@@ -37,6 +37,7 @@ await hnsw.buildIndex(data);
 
 // Search for nearest neighbors
 const results = hnsw.searchKNN([6, 7, 8, 9, 10], 2);
+const resultsWithEf = hnsw.searchKNN([6, 7, 8, 9, 10], 2, { efSearch: 100 });
 console.log(results);
 ```
 
@@ -45,7 +46,7 @@ Persistent index using IndexedDB:
 import { HNSWWithDB } from 'hnsw';
 
 // With persistence
-const index = await HNSWWithDB.create(200, 16, 'my-index');
+const index = await HNSWWithDB.create(16, 200, 'my-index', 50);
 
 // Make some data
 const data = [
@@ -61,7 +62,7 @@ await index.buildIndex(data);
 await index.saveIndex();
 
 // Load the index
-const index2 = await HNSWWithDB.create(200, 16, 'my-index-2');
+const index2 = await HNSWWithDB.create(16, 200, 'my-index-2', 50);
 await index2.loadIndex();
 
 // Search for nearest neighbors
@@ -72,3 +73,42 @@ console.log(results2);
 await index2.deleteIndex();
 ```
 
+Notes:
+- The `metric` determines how scores are computed: `cosine` uses cosine similarity and `euclidean` uses an inverse-distance similarity (higher is better in both cases).
+- `efSearch` controls query-time exploration and should be at least `k` for best recall.
+
+## Benchmarks
+
+A lightweight benchmark harness is available to validate recall/latency tradeoffs and the impact of parameters like `efSearch`, `M`, and `efConstruction`.
+
+Build the project first:
+```/dev/null/build.sh#L1-1
+npm run build
+```
+
+Download SIFT small (10k) dataset:
+```/dev/null/download-siftsmall.sh#L1-2
+node dist/bench/download.js --extract
+```
+
+Synthetic dataset (fast sanity check):
+```/dev/null/synthetic.sh#L1-2
+node dist/bench/run.js --mode synthetic --count 10000 --dim 64 --metric cosine
+```
+
+FVECS dataset (SIFT/GloVe-style):
+```/dev/null/fvecs.sh#L1-2
+node dist/bench/run.js --mode fvecs --base bench/datasets/siftsmall_base.fvecs --query bench/datasets/siftsmall_query.fvecs --metric euclidean --limit 10000 --query-limit 100
+```
+
+Compare results (baseline vs changes):
+```/dev/null/report.sh#L1-2
+node dist/bench/report.js --base bench/outputs/baseline.json --candidate bench/outputs/changes.json --format csv --output bench/outputs/compare.csv
+```
+
+One-shot compare (runs baseline + candidate + report in one command):
+```/dev/null/compare.sh#L1-2
+node dist/bench/compare.js --base-ref HEAD~1 --candidate-ref HEAD --mode fvecs --base bench/datasets/siftsmall_base.fvecs --query bench/datasets/siftsmall_query.fvecs --metric euclidean --limit 10000 --query-limit 100
+```
+
+For more details, see `bench/README.md`.

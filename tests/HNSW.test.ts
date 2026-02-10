@@ -1,7 +1,7 @@
-// @ts-nocheck
 import { HNSW } from '../src';
+import { Node } from '../src/node';
 
-const createSequentialData = (count, dimensions = 5) =>
+const createSequentialData = (count: number, dimensions = 5) =>
   Array.from({ length: count }, (_, index) => ({
     id: index + 1,
     vector: Array.from({ length: dimensions }, (_, dimIndex) => dimIndex + 1 + index),
@@ -16,9 +16,16 @@ const buildBasicIndex = async (
     metric = 'cosine',
     M = 16,
     efConstruction = 200,
-  }: { levelSequence?: number[]; metric?: 'cosine' | 'euclidean'; M?: number; efConstruction?: number } = {},
+    efSearch = 50,
+  }: {
+    levelSequence?: number[];
+    metric?: 'cosine' | 'euclidean';
+    M?: number;
+    efConstruction?: number;
+    efSearch?: number;
+  } = {},
 ) => {
-  const hnsw = new HNSW(M, efConstruction, data[0].vector.length, metric);
+  const hnsw = new HNSW(M, efConstruction, data[0].vector.length, metric, efSearch);
   const sequence = levelSequence ? [...levelSequence] : undefined;
   const selectMock = sequence
     ? jest.spyOn(hnsw as any, 'selectLevel').mockImplementation(() => (sequence!.shift() as number) ?? 0)
@@ -57,6 +64,18 @@ describe('HNSW', () => {
     expect((hnsw as any).levelMax).toBe(3);
   });
 
+  it('uses efSearch for query-time exploration with overrides', async () => {
+    const hnsw = await buildBasicIndex(baseData, { levelSequence: Array(baseData.length).fill(0), efSearch: 4 });
+    const spy = jest.spyOn(hnsw as any, 'searchLayer');
+
+    hnsw.searchKNN([3, 4, 5, 6, 7], 2);
+    expect(spy).toHaveBeenNthCalledWith(1, [3, 4, 5, 6, 7], expect.anything(), 0, 4);
+
+    hnsw.searchKNN([3, 4, 5, 6, 7], 2, { efSearch: 3 });
+    expect(spy).toHaveBeenNthCalledWith(2, [3, 4, 5, 6, 7], expect.anything(), 0, 3);
+    spy.mockRestore();
+  });
+
   it('keeps only the M most similar neighbors per node', async () => {
     const linearData = [
       { id: 1, vector: [0, 0] },
@@ -73,11 +92,24 @@ describe('HNSW', () => {
     });
 
     const node4 = (hnsw as any).nodes.get(4);
-    expect(node4.neighbors[0]).toEqual([3, 2]);
+    expect(node4.neighbors[0]).toContain(3);
+    expect(node4.neighbors[0]).toHaveLength(1);
 
     const node2 = (hnsw as any).nodes.get(2);
-    expect(node2.neighbors[0]).toHaveLength(2);
+    expect(node2.neighbors[0].length).toBeLessThanOrEqual(2);
     expect(node2.neighbors[0]).toEqual(expect.arrayContaining([3, 1]));
+  });
+
+  it('selects diverse neighbors using the heuristic', async () => {
+    const hnsw = new HNSW(2, 16, 2, 'euclidean');
+    const center = new Node(1, [0, 0], 0);
+    const candidateA = new Node(2, [1, 0], 0);
+    const candidateB = new Node(3, [2, 0], 0);
+    const candidateC = new Node(4, [0, 2], 0);
+
+    const selected = (hnsw as any).selectNeighborsHeuristic(center, [candidateA, candidateB, candidateC], 2);
+    const selectedIds = selected.map((node: Node) => node.id);
+    expect(selectedIds).toEqual([2, 4]);
   });
 
   it('round-trips through JSON serialization without losing neighbors', async () => {
