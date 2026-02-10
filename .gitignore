@@ -131,3 +131,8 @@ dist
 
 # Typescript 
 /dist
+# Benchmark data files
+bench/datasets/*.tar.gz
+bench/datasets/sift/
+bench/datasets/siftsmall/
+bench/outputs/*.json
