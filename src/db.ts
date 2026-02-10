@@ -1,10 +1,13 @@
 import { HNSW } from './main';
 import { openDB, deleteDB, DBSchema, IDBPDatabase } from 'idb';
+import { cosineSimilarity, euclideanSimilarity } from './similarity';
+
+type SerializedIndex = ReturnType<HNSW['toJSON']>;
 
 interface HNSWDB extends DBSchema {
   'hnsw-index': {
     key: string;
-    value: any;
+    value: SerializedIndex;
   };
 }
 
@@ -17,6 +20,9 @@ export class HNSWWithDB extends HNSW {
     this.dbName = dbName;
   }
 
+  /**
+   * Creates an IndexedDB-backed HNSW instance.
+   */
   static async create(M: number, efConstruction: number, dbName: string, efSearch = 50) {
     const instance = new HNSWWithDB(M, efConstruction, dbName, efSearch);
     await instance.initDB();
@@ -31,25 +37,39 @@ export class HNSWWithDB extends HNSW {
     });
   }
 
+  /**
+   * Closes the current IndexedDB connection if open.
+   */
+  close() {
+    if (!this.db) {
+      return;
+    }
+    this.db.close();
+    this.db = null;
+  }
+
+  /**
+   * Persists the current graph to IndexedDB.
+   */
   async saveIndex() {
     if (!this.db) {
-      // console.error('Database is not initialized');
-      return;
+      throw new Error('Database is not initialized');
     }
 
     await this.db.put('hnsw-index', this.toJSON(), 'hnsw');
   }
 
+  /**
+   * Loads a persisted graph from IndexedDB if present.
+   */
   async loadIndex() {
     if (!this.db) {
-      // console.error('Database is not initialized');
-      return;
+      throw new Error('Database is not initialized');
     }
 
-    const loadedHNSW: HNSW | undefined = await this.db.get('hnsw-index', 'hnsw');
+    const loadedHNSW = await this.db.get('hnsw-index', 'hnsw');
 
     if (!loadedHNSW) {
-      // console.error('No saved HNSW index found');
       return;
     }
 
@@ -60,23 +80,22 @@ export class HNSWWithDB extends HNSW {
     this.efSearch = hnsw.efSearch;
     this.metric = hnsw.metric;
     this.d = hnsw.d;
-    this.similarityFunction = (this as any).getMetric(hnsw.metric);
+    this.similarityFunction = hnsw.metric === 'cosine' ? cosineSimilarity : euclideanSimilarity;
     this.levelMax = hnsw.levelMax;
     this.entryPointId = hnsw.entryPointId;
     this.nodes = hnsw.nodes;
   }
 
+  /**
+   * Deletes persisted graph data and re-initializes the backing DB.
+   */
   async deleteIndex() {
     if (!this.db) {
-      // console.error('Database is not initialized');
-      return;
+      throw new Error('Database is not initialized');
     }
 
-    try {
-      await deleteDB(this.dbName);
-      this.initDB();
-    } catch (error) {
-      // console.error('Failed to delete index:', error);
-    }
+    this.close();
+    await deleteDB(this.dbName);
+    await this.initDB();
   }
 }

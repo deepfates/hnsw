@@ -17,6 +17,9 @@ export class HNSW {
   nodes: Map<number, Node>; // Map of nodes
   probs: number[]; // Probabilities for the levels
 
+  /**
+   * Creates an in-memory HNSW index.
+   */
   constructor(M = 16, efConstruction = 200, d: number | null = null, metric = 'cosine', efSearch?: number) {
     this.metric = metric as Metric;
     this.d = d;
@@ -225,6 +228,9 @@ export class HNSW {
     }
   }
 
+  /**
+   * Adds a single vector to the graph.
+   */
   async addPoint(id: number, vector: Float32Array | number[]) {
     if (this.d !== null && vector.length !== this.d) {
       throw new Error('All vectors must be of the same dimension');
@@ -241,6 +247,9 @@ export class HNSW {
     await this.addNodeToGraph(node);
   }
 
+  /**
+   * Returns up to k nearest neighbors for the query vector.
+   */
   searchKNN(
     query: Float32Array | number[],
     k: number,
@@ -273,6 +282,9 @@ export class HNSW {
     return results;
   }
 
+  /**
+   * Rebuilds the graph from the provided data.
+   */
   async buildIndex(
     data: { id: number; vector: Float32Array | number[] }[],
     options?: {
@@ -304,6 +316,9 @@ export class HNSW {
     }
   }
 
+  /**
+   * Serializes the current in-memory index.
+   */
   toJSON() {
     const entries = Array.from(this.nodes.entries());
     return {
@@ -328,6 +343,9 @@ export class HNSW {
     };
   }
 
+  /**
+   * Restores an index from serialized JSON produced by toJSON().
+   */
   static fromJSON(json: any): HNSW {
     // efSearch defaults to efConstruction if not present (backward compatibility)
     const hnsw = new HNSW(json.M, json.efConstruction, json.d ?? null, json.metric ?? 'cosine', json.efSearch);
