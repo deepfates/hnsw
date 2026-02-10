@@ -12,13 +12,13 @@ export class HNSWWithDB extends HNSW {
   dbName: string;
   db: IDBPDatabase<HNSWDB> | null = null;
 
-  private constructor(M: number, efConstruction: number, dbName: string) {
-    super(M, efConstruction);
+  private constructor(M: number, efConstruction: number, dbName: string, efSearch = 50) {
+    super(M, efConstruction, null, 'cosine', efSearch);
     this.dbName = dbName;
   }
 
-  static async create(M: number, efConstruction: number, dbName: string) {
-    const instance = new HNSWWithDB(M, efConstruction, dbName);
+  static async create(M: number, efConstruction: number, dbName: string, efSearch = 50) {
+    const instance = new HNSWWithDB(M, efConstruction, dbName, efSearch);
     await instance.initDB();
     return instance;
   }
@@ -57,6 +57,10 @@ export class HNSWWithDB extends HNSW {
     const hnsw = HNSW.fromJSON(loadedHNSW);
     this.M = hnsw.M;
     this.efConstruction = hnsw.efConstruction;
+    this.efSearch = hnsw.efSearch;
+    this.metric = hnsw.metric;
+    this.d = hnsw.d;
+    this.similarityFunction = (this as any).getMetric(hnsw.metric);
     this.levelMax = hnsw.levelMax;
     this.entryPointId = hnsw.entryPointId;
     this.nodes = hnsw.nodes;
