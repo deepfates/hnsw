@@ -41,7 +41,8 @@ function parseArgs(argv: string[]): CliConfig {
   const runScriptPath = resolve(runScriptPathRaw ?? 'dist/bench/run.js');
   const reportScriptPath = resolve(reportScriptPathRaw ?? 'dist/bench/report.js');
   const buildIfMissing = !runScriptPathRaw || !reportScriptPathRaw;
-  const injectSources = has('--inject-sources');
+  // Default to injecting sources unless explicitly disabled
+  const injectSources = !has('--no-inject-sources');
   const injectDir = resolve(get('--inject-dir') ?? 'bench/outputs/bench-sources');
 
   const passthroughFlags = [
@@ -225,8 +226,7 @@ Options:
   --allow-dirty            Allow dirty working tree
   --bench-runner <path>    Path to bench runner JS (useful for older refs)
   --bench-reporter <path>  Path to bench report JS (useful for older refs)
-  --inject-sources         Copy bench TS sources when the target ref lacks them
-  --no-inject-sources      Disable bench source injection (default)
+  --no-inject-sources      Disable auto-injection of bench sources (injection is ON by default)
   --inject-dir <path>      Destination directory for injected sources
 
 Examples:

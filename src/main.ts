@@ -17,12 +17,13 @@ export class HNSW {
   nodes: Map<number, Node>; // Map of nodes
   probs: number[]; // Probabilities for the levels
 
-  constructor(M = 16, efConstruction = 200, d: number | null = null, metric = 'cosine', efSearch = 50) {
+  constructor(M = 16, efConstruction = 200, d: number | null = null, metric = 'cosine', efSearch?: number) {
     this.metric = metric as Metric;
     this.d = d;
     this.M = M;
     this.efConstruction = efConstruction;
-    this.efSearch = efSearch;
+    // Default efSearch to efConstruction for backward compatibility
+    this.efSearch = efSearch ?? efConstruction;
     this.entryPointId = -1;
     this.nodes = new Map<number, Node>();
     this.probs = this.set_probs(M, 1 / Math.log(M));
@@ -328,7 +329,8 @@ export class HNSW {
   }
 
   static fromJSON(json: any): HNSW {
-    const hnsw = new HNSW(json.M, json.efConstruction, json.d ?? null, json.metric ?? 'cosine', json.efSearch ?? 50);
+    // efSearch defaults to efConstruction if not present (backward compatibility)
+    const hnsw = new HNSW(json.M, json.efConstruction, json.d ?? null, json.metric ?? 'cosine', json.efSearch);
     hnsw.levelMax = json.levelMax;
     hnsw.entryPointId = json.entryPointId;
     hnsw.nodes = new Map(

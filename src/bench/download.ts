@@ -55,12 +55,13 @@ async function downloadFile(options: DownloadOptions): Promise<string> {
   await new Promise<void>((resolvePromise, rejectPromise) => {
     const req = request(url, { timeout: timeoutMs }, async (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        // follow redirect
+        // follow redirect - resolve relative URLs against the original
         res.resume();
         try {
+          const redirectUrl = new URL(res.headers.location, url).toString();
           const redirected = await downloadFile({
             ...options,
-            url: res.headers.location,
+            url: redirectUrl,
             filename: finalName,
           });
           resolvePromise();
