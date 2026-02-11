@@ -19,7 +19,8 @@ Thanks for taking the time to improve this HNSW implementation. The checklist be
 - Add or update tests under `tests/` that capture the bug fix or feature so regressions are caught automatically. The `tests/HNSW.test.ts` suite shows how to build deterministic indices for verification.
 - Before committing, run the full set of quality gates:
   - `npm test` – runs the Jest harness
-  - `npm run lint` – checks the TypeScript sources with TSLint
+  - `npm run lint` – checks published TypeScript sources with TSLint
+  - `npm run lint:bench` – optional lint pass for benchmark CLI sources
   - `npm run build` – ensures the TypeScript compiler can emit the distributable files
 
 ## 4. Commit with context

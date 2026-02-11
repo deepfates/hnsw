@@ -1,4 +1,6 @@
+import 'fake-indexeddb/auto';
 import { HNSW } from '../src';
+import { HNSWWithDB } from '../src';
 import { Node } from '../src/node';
 
 const createSequentialData = (count: number, dimensions = 5) =>
@@ -121,5 +123,59 @@ describe('HNSW', () => {
     const restoredResults = restored.searchKNN([6, 7, 8, 9, 10], 2);
 
     expect(restoredResults).toEqual(originalResults);
+  });
+
+  it('throws when adding vectors with inconsistent dimensions', async () => {
+    const hnsw = new HNSW(16, 32, 3, 'cosine', 16);
+    await hnsw.addPoint(1, [1, 2, 3]);
+    await expect(hnsw.addPoint(2, [1, 2])).rejects.toThrow('All vectors must be of the same dimension');
+  });
+
+  it('returns all candidates when k is larger than index size', async () => {
+    const hnsw = await buildBasicIndex(baseData, { levelSequence: Array(baseData.length).fill(0) });
+    const results = hnsw.searchKNN([6, 7, 8, 9, 10], 10);
+    expect(results.length).toBe(baseData.length);
+  });
+
+  it('invokes progress callback for final partial interval', async () => {
+    const hnsw = new HNSW(16, 32, 5, 'cosine', 16);
+    const onProgress = jest.fn();
+    await hnsw.buildIndex(baseData, { onProgress, progressInterval: 3 });
+    expect(onProgress).toHaveBeenCalledWith(3, 5);
+    expect(onProgress).toHaveBeenCalledWith(5, 5);
+  });
+});
+
+describe('HNSWWithDB', () => {
+  const dbName = () => `hnsw-test-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  it('saves and loads persisted indices', async () => {
+    const name = dbName();
+    const index = await HNSWWithDB.create(16, 32, name, 24);
+    await index.buildIndex(baseData);
+    const baseline = index.searchKNN([6, 7, 8, 9, 10], 3);
+    await index.saveIndex();
+
+    const loaded = await HNSWWithDB.create(16, 32, name, 24);
+    await loaded.loadIndex();
+    const restored = loaded.searchKNN([6, 7, 8, 9, 10], 3);
+
+    expect(restored).toEqual(baseline);
+    index.close();
+    loaded.close();
+  });
+
+  it('deleteIndex removes persisted state and re-initializes DB', async () => {
+    const name = dbName();
+    const index = await HNSWWithDB.create(16, 32, name, 24);
+    await index.buildIndex(baseData);
+    await index.saveIndex();
+    await index.deleteIndex();
+    index.close();
+
+    const loaded = await HNSWWithDB.create(16, 32, name, 24);
+    await loaded.loadIndex();
+    expect(loaded.searchKNN([6, 7, 8, 9, 10], 3)).toEqual([]);
+    loaded.close();
   });
 });

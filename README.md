@@ -1,5 +1,8 @@
 # HNSW
 
+[![npm version](https://img.shields.io/npm/v/hnsw)](https://www.npmjs.com/package/hnsw)
+[![license](https://img.shields.io/npm/l/hnsw)](./LICENSE)
+
 This is a small Typescript package that implements the Hierarchical Navigable Small Worlds algorithm for approximate nearest neighbor search.
 
 I wrote this package because I wanted to do efficient vector search directly in the client browser. All the other implementations I found for TS were either bindings for libraries written in other languages, or dealt with WASM compilation complexity.
@@ -61,8 +64,8 @@ const data = [
 await index.buildIndex(data);
 await index.saveIndex();
 
-// Load the index
-const index2 = await HNSWWithDB.create(16, 200, 'my-index-2', 50);
+// Load the same index from disk
+const index2 = await HNSWWithDB.create(16, 200, 'my-index', 50);
 await index2.loadIndex();
 
 // Search for nearest neighbors
@@ -76,6 +79,52 @@ await index2.deleteIndex();
 Notes:
 - The `metric` determines how scores are computed: `cosine` uses cosine similarity and `euclidean` uses an inverse-distance similarity (higher is better in both cases).
 - `efSearch` controls query-time exploration and should be at least `k` for best recall.
+
+## API Reference
+
+### `new HNSW(M, efConstruction, d?, metric?, efSearch?)`
+
+- `M`: Max neighbors stored per node and layer. Higher values usually improve recall and memory cost.
+- `efConstruction`: Build-time exploration depth. Higher values improve index quality and build time cost.
+- `d`: Vector dimension. If omitted, inferred from first inserted vector.
+- `metric`: `cosine` or `euclidean`.
+- `efSearch`: Query-time exploration depth. Higher values improve recall and query latency cost.
+
+### `buildIndex(data, options?)`
+
+- `data`: Array of `{ id, vector }`.
+- `options.onProgress(current, total)`: Optional progress callback.
+- `options.progressInterval`: Callback cadence (default `10000`).
+
+### `searchKNN(query, k, options?)`
+
+- Returns up to `k` results with shape `{ id, score }`.
+- `options.efSearch`: Per-query override. Effective search breadth is `max(k, efSearch)`.
+
+### `toJSON()` / `HNSW.fromJSON(json)`
+
+- Serialize and restore in-memory indices for transport or persistence.
+
+### `HNSWWithDB.create(M, efConstruction, dbName, efSearch?)`
+
+- Creates an IndexedDB-backed index (browser/runtime with IndexedDB support).
+- `saveIndex()`: Persist current graph.
+- `loadIndex()`: Load previously persisted graph (no-op if missing).
+- `deleteIndex()`: Delete persisted graph and reinitialize DB.
+- `close()`: Close the active IndexedDB connection.
+
+## Tuning Guide
+
+- Start with `M=16`, `efConstruction=200`, `efSearch=50`.
+- Increase `efSearch` first when recall is too low.
+- Increase `M` for tougher datasets when memory budget allows.
+- Keep `efSearch >= k` for better recall consistency.
+
+## Limitations
+
+- This implementation prioritizes simplicity over peak throughput and memory efficiency.
+- IndexedDB support depends on environment support for IndexedDB APIs.
+- Benchmark tools under `src/bench` are maintained as CLI utilities and are not part of the runtime API surface.
 
 ## Benchmarks
 
