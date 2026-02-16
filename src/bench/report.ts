@@ -88,17 +88,7 @@ function parseArgs(argv: string[]): CliConfig {
 function makeKey(result: BenchmarkResult): string {
   const d = result.dataset;
   const p = result.params;
-  return [
-    d.name,
-    d.metric,
-    d.dimension,
-    d.count,
-    d.queries,
-    p.M,
-    p.efConstruction,
-    p.efSearch,
-    p.k,
-  ].join('|');
+  return [d.name, d.metric, d.dimension, d.count, d.queries, p.M, p.efConstruction, p.efSearch, p.k].join('|');
 }
 
 function summarizeDelta(values: number[]) {
@@ -261,10 +251,22 @@ function printSummary(rows: ComparisonRow[]) {
   const buildStats = summarizeDelta(buildDeltas);
 
   console.log('Summary (candidate - base):');
-  console.log(`  recall@k  avg=${recallStats.avg.toFixed(6)} min=${recallStats.min.toFixed(6)} max=${recallStats.max.toFixed(6)}`);
-  console.log(`  latencyAvg ms  avg=${latencyAvgStats.avg.toFixed(6)} min=${latencyAvgStats.min.toFixed(6)} max=${latencyAvgStats.max.toFixed(6)}`);
-  console.log(`  latencyP95 ms  avg=${latencyP95Stats.avg.toFixed(6)} min=${latencyP95Stats.min.toFixed(6)} max=${latencyP95Stats.max.toFixed(6)}`);
-  console.log(`  buildMs  avg=${buildStats.avg.toFixed(3)} min=${buildStats.min.toFixed(3)} max=${buildStats.max.toFixed(3)}`);
+  console.log(
+    `  recall@k  avg=${recallStats.avg.toFixed(6)} min=${recallStats.min.toFixed(6)} max=${recallStats.max.toFixed(6)}`,
+  );
+  console.log(
+    `  latencyAvg ms  avg=${latencyAvgStats.avg.toFixed(6)} min=${latencyAvgStats.min.toFixed(
+      6,
+    )} max=${latencyAvgStats.max.toFixed(6)}`,
+  );
+  console.log(
+    `  latencyP95 ms  avg=${latencyP95Stats.avg.toFixed(6)} min=${latencyP95Stats.min.toFixed(
+      6,
+    )} max=${latencyP95Stats.max.toFixed(6)}`,
+  );
+  console.log(
+    `  buildMs  avg=${buildStats.avg.toFixed(3)} min=${buildStats.min.toFixed(3)} max=${buildStats.max.toFixed(3)}`,
+  );
 }
 
 function printUsage() {
@@ -314,11 +316,7 @@ async function main() {
     process.exit(1);
   }
 
-  const { rows, missingInBase, missingInCandidate } = compareResults(
-    baseResults,
-    candidateResults,
-    config.strict,
-  );
+  const { rows, missingInBase, missingInCandidate } = compareResults(baseResults, candidateResults, config.strict);
 
   printSummary(rows);
 
@@ -334,9 +332,7 @@ async function main() {
   if (config.output) {
     const outputPath = resolve(config.output);
     const payload =
-      config.format === 'csv'
-        ? toCsv(rows)
-        : JSON.stringify({ rows, missingInBase, missingInCandidate }, null, 2);
+      config.format === 'csv' ? toCsv(rows) : JSON.stringify({ rows, missingInBase, missingInCandidate }, null, 2);
 
     await writeFile(outputPath, payload, 'utf8');
     console.log(`Report written to ${outputPath}`);

@@ -62,19 +62,13 @@ export async function loadFvecsDataset(
   return { name, dimension, metric, vectors };
 }
 
-export async function readFvecs(
-  filePath: string,
-  options: FVecsLoadOptions = {},
-): Promise<VectorRecord[]> {
+export async function readFvecs(filePath: string, options: FVecsLoadOptions = {}): Promise<VectorRecord[]> {
   const { limit, offset = 0, asFloat32 = true } = options;
   const data = await readFile(filePath);
   return decodeFvecsBuffer(data, { limit, offset, asFloat32 });
 }
 
-export function decodeFvecsBuffer(
-  buffer: Buffer,
-  options: FVecsLoadOptions = {},
-): VectorRecord[] {
+export function decodeFvecsBuffer(buffer: Buffer, options: FVecsLoadOptions = {}): VectorRecord[] {
   const { limit, offset = 0, asFloat32 = true } = options;
 
   const vectors: VectorRecord[] = [];
@@ -118,19 +112,13 @@ export async function loadIvecsAsFloatDataset(
   return { name, dimension, metric, vectors };
 }
 
-export async function readIvecsAsFloat(
-  filePath: string,
-  options: FVecsLoadOptions = {},
-): Promise<VectorRecord[]> {
+export async function readIvecsAsFloat(filePath: string, options: FVecsLoadOptions = {}): Promise<VectorRecord[]> {
   const { limit, offset = 0 } = options;
   const data = await readFile(filePath);
   return decodeIvecsAsFloatBuffer(data, { limit, offset });
 }
 
-export function decodeIvecsAsFloatBuffer(
-  buffer: Buffer,
-  options: FVecsLoadOptions = {},
-): VectorRecord[] {
+export function decodeIvecsAsFloatBuffer(buffer: Buffer, options: FVecsLoadOptions = {}): VectorRecord[] {
   const { limit, offset = 0 } = options;
 
   const vectors: VectorRecord[] = [];
