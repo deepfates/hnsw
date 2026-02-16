@@ -7,6 +7,13 @@ and this project adheres to Semantic Versioning.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-02-16
+
+### Changed
+- npm package contents now use an explicit `files` whitelist to publish only runtime artifacts and top-level docs.
+
+## [1.1.0] - 2026-02-16
+
 ### Added
 - CI workflow for build, lint, test, and coverage.
 - Persistence-focused test coverage for IndexedDB-backed index behavior.
