@@ -8,7 +8,11 @@ function dotProduct(a: Float32Array | number[], b: Float32Array | number[]): num
 }
 
 export function cosineSimilarity(a: Float32Array | number[], b: Float32Array | number[]): number {
-  return dotProduct(a, b) / (Math.sqrt(dotProduct(a, a)) * Math.sqrt(dotProduct(b, b)));
+  const denominator = Math.sqrt(dotProduct(a, a)) * Math.sqrt(dotProduct(b, b));
+  if (denominator === 0) {
+    return 0;
+  }
+  return dotProduct(a, b) / denominator;
 }
 
 function euclideanDistance(a: Float32Array | number[], b: Float32Array | number[]): number {
