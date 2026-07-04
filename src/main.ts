@@ -259,6 +259,10 @@ export class HNSW {
       return [];
     }
 
+    if (this.d !== null && query.length !== this.d) {
+      throw new Error(`Query vector must have dimension ${this.d}, got ${query.length}`);
+    }
+
     let entryNode = this.nodes.get(this.entryPointId)!;
     for (let level = this.levelMax; level > 0; level--) {
       entryNode = this.greedySearch(query, entryNode, level);

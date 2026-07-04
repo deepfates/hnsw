@@ -137,6 +137,11 @@ describe('HNSW', () => {
     expect(results.length).toBe(baseData.length);
   });
 
+  it('throws when searching with a query vector of the wrong dimension', async () => {
+    const hnsw = await buildBasicIndex(baseData, { levelSequence: Array(baseData.length).fill(0) });
+    expect(() => hnsw.searchKNN([1, 2, 3], 3)).toThrow('Query vector must have dimension 5, got 3');
+  });
+
   it('invokes progress callback for final partial interval', async () => {
     const hnsw = new HNSW(16, 32, 5, 'cosine', 16);
     const onProgress = jest.fn();
