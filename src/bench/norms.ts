@@ -8,8 +8,16 @@
 // efSearch=64, k=8. Vectors and level selection are seeded, so the same graph
 // is built on every run and across implementations. Run it on the baseline
 // commit and on this branch (same machine, same Node) to get before/after
-// numbers.
+// numbers. Note this harness does not exist at the baseline commit (8542a17):
+// to benchmark the baseline, copy this file into the baseline checkout
+// (`git worktree add <dir> 8542a17 && cp src/bench/norms.ts <dir>/src/bench/`),
+// build there, and run it.
+//
+// Verification digests (sha256) cover the FULL serialized graph and EVERY
+// ordered search result — not an aggregate — so a baseline/branch match means
+// identical graphs and identical result lists, bit for bit.
 
+import { createHash } from 'crypto';
 import { HNSW } from '../main';
 
 function mulberry32(seed: number) {
@@ -49,13 +57,15 @@ async function run() {
   for (let i = 0; i < 100; i++) {
     hnsw.searchKNN(queries[i % numQueries], k);
   }
-  let checksum = 0;
+  const allResults: { id: number; score: number }[][] = [];
   const queryStart = performance.now();
   for (const query of queries) {
-    const results = hnsw.searchKNN(query, k);
-    checksum += results[0].id + results[0].score;
+    allResults.push(hnsw.searchKNN(query, k));
   }
   const queryMs = performance.now() - queryStart;
+
+  const graphDigest = createHash('sha256').update(JSON.stringify(hnsw.toJSON())).digest('hex');
+  const resultsDigest = createHash('sha256').update(JSON.stringify(allResults)).digest('hex');
 
   process.stdout.write(
     [
@@ -64,7 +74,8 @@ async function run() {
       `build: ${(buildMs / 1000).toFixed(2)} s`,
       `query: ${(queryMs / 1000).toFixed(2)} s (${((queryMs / numQueries) * 1000).toFixed(0)} us/query)`,
       `total: ${((buildMs + queryMs) / 1000).toFixed(2)} s`,
-      `checksum (compare across implementations): ${checksum}`,
+      `graph digest (sha256 of full toJSON, compare across implementations): ${graphDigest}`,
+      `results digest (sha256 of all ordered search results): ${resultsDigest}`,
       '',
     ].join('\n'),
   );

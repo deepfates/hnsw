@@ -110,8 +110,13 @@ describe('public similarityFunction is respected', () => {
   });
 });
 
-describe('mutating a stored vector still affects scoring, as pre-change', () => {
-  it('scores reflect the current vector contents on every search', async () => {
+// Contract: vectors are immutable once inserted. The index stores vectors by
+// reference and caches each node's L2 norm at insert time, so mutating a
+// vector afterwards produces stale-but-stable scores: the cached norm is the
+// original vector's, while dot products read the mutated contents. This test
+// pins that semantics so the contract is enforced by test, not just prose.
+describe('immutability contract: mutation after insert yields stale-but-stable scores', () => {
+  it('post-insert mutation does not produce fresh cosine scores', async () => {
     const data = Array.from({ length: 6 }, (_, i) => ({
       id: i,
       vector: [i + 1, i + 2, i + 3],
@@ -121,10 +126,16 @@ describe('mutating a stored vector still affects scoring, as pre-change', () => 
     const query = [0.5, -0.25, 1];
 
     const before = hnsw.searchKNN(query, 6).find((r) => r.id === 2)!;
-    data[2].vector[0] = -50; // mutate in place; the index holds this array by reference
+    data[2].vector[0] = -50; // contract violation: mutate in place after insertion
     const after = hnsw.searchKNN(query, 6).find((r) => r.id === 2)!;
 
-    expect(after.score).not.toBe(before.score);
-    expect(after.score).toBe(cosineSimilarity([-50, 4, 5], query));
+    // Stale: the score is NOT what a fresh computation over the mutated
+    // vector would give, because the norm cached at insert time is reused.
+    expect(after.score).not.toBe(cosineSimilarity([-50, 4, 5], query));
+    // Stable: repeated searches keep returning the same (stale) score.
+    const again = hnsw.searchKNN(query, 6).find((r) => r.id === 2)!;
+    expect(again.score).toBe(after.score);
+    // And the pre-mutation score was the honest one.
+    expect(before.score).toBe(cosineSimilarity([3, 4, 5], query));
   });
 });

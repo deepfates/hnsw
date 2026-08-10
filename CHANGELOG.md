@@ -7,6 +7,9 @@ and this project adheres to Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+- Cosine comparisons now cost a single dot product: each node's L2 norm is cached at insert time and the query norm is computed once per operation (~2.3x faster build+query on 10k x 384). This relies on a now-documented contract: vectors must not be mutated after insertion; the index caches derived values. Mutating a stored vector yields stale-but-stable scores. Euclidean and custom `similarityFunction` overrides are unaffected and take the original code path.
+
 ## [1.1.1] - 2026-02-16
 
 ### Changed

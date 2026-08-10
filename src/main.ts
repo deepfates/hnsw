@@ -5,12 +5,11 @@ import { cosineSimilarity, cosineSimilarityFromNorms, euclideanSimilarity, norm 
 type Metric = 'cosine' | 'euclidean';
 type SearchCandidate = { node: Node; score: number };
 
-// Per-operation norm cache for the cosine fast path. Created at the start of
-// each public operation (addPoint / searchKNN) and discarded when it returns,
-// so a stale norm is impossible: vectors are re-read on every operation, just
-// like the un-cached implementation. `queryNorm` is the norm of the vector
-// being inserted or searched, computed once per operation.
-type CosineContext = { queryNorm: number; norms: Map<Node, number> };
+// Cosine fast-path context: the norm of the vector being inserted or
+// searched, computed once per operation. Stored-node norms are cached on the
+// Node itself at insert time (see Node.norm), which is valid because vectors
+// are immutable once inserted — see README "Vector immutability".
+type CosineContext = { queryNorm: number };
 
 export class HNSW {
   metric: Metric; // Metric to use
@@ -55,26 +54,17 @@ export class HNSW {
   // cosineSimilarity. Euclidean indexes and any user-assigned custom function
   // get the original per-comparison calls (same operand orientation) and never
   // pay for norm computation.
-  private cosineContext(query: Float32Array | number[]): CosineContext | null {
+  private cosineContext(query: Float32Array | number[], queryNorm?: number): CosineContext | null {
     if (this.similarityFunction !== cosineSimilarity) {
       return null;
     }
-    return { queryNorm: norm(query), norms: new Map<Node, number>() };
-  }
-
-  private nodeNorm(ctx: CosineContext, node: Node): number {
-    let cached = ctx.norms.get(node);
-    if (cached === undefined) {
-      cached = norm(node.vector);
-      ctx.norms.set(node, cached);
-    }
-    return cached;
+    return { queryNorm: queryNorm ?? norm(query) };
   }
 
   // Traversal scoring; pre-optimization operand order was (query, node.vector).
   private scoreQueryToNode(query: Float32Array | number[], node: Node, ctx: CosineContext | null): number {
     if (ctx) {
-      return cosineSimilarityFromNorms(query, node.vector, ctx.queryNorm, this.nodeNorm(ctx, node));
+      return cosineSimilarityFromNorms(query, node.vector, ctx.queryNorm, node.norm);
     }
     return this.similarityFunction(query, node.vector);
   }
@@ -82,7 +72,7 @@ export class HNSW {
   // Final result scoring; pre-optimization operand order was (node.vector, query).
   private scoreNodeToQuery(node: Node, query: Float32Array | number[], ctx: CosineContext | null): number {
     if (ctx) {
-      return cosineSimilarityFromNorms(node.vector, query, this.nodeNorm(ctx, node), ctx.queryNorm);
+      return cosineSimilarityFromNorms(node.vector, query, node.norm, ctx.queryNorm);
     }
     return this.similarityFunction(node.vector, query);
   }
@@ -90,7 +80,7 @@ export class HNSW {
   // Neighbor-selection scoring; pre-optimization operand order was (a.vector, b.vector).
   private scoreNodeToNode(a: Node, b: Node, ctx: CosineContext | null): number {
     if (ctx) {
-      return cosineSimilarityFromNorms(a.vector, b.vector, this.nodeNorm(ctx, a), this.nodeNorm(ctx, b));
+      return cosineSimilarityFromNorms(a.vector, b.vector, a.norm, b.norm);
     }
     return this.similarityFunction(a.vector, b.vector);
   }
@@ -273,7 +263,7 @@ export class HNSW {
       return;
     }
 
-    const ctx = this.cosineContext(node.vector);
+    const ctx = this.cosineContext(node.vector, node.norm);
     const currentMaxLevel = this.levelMax;
     let entryNode = this.nodes.get(this.entryPointId)!;
 
@@ -298,6 +288,10 @@ export class HNSW {
 
   /**
    * Adds a single vector to the graph.
+   *
+   * The vector must not be mutated after insertion: the index stores it by
+   * reference and caches derived values (its L2 norm) at insert time, so
+   * later mutation yields stale — though stable — scores.
    */
   async addPoint(id: number, vector: Float32Array | number[]) {
     if (this.d !== null && vector.length !== this.d) {
