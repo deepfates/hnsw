@@ -71,10 +71,10 @@ describe('HNSW', () => {
     const spy = jest.spyOn(hnsw as any, 'searchLayer');
 
     hnsw.searchKNN([3, 4, 5, 6, 7], 2);
-    expect(spy).toHaveBeenNthCalledWith(1, [3, 4, 5, 6, 7], expect.anything(), 0, 4);
+    expect(spy).toHaveBeenNthCalledWith(1, [3, 4, 5, 6, 7], expect.anything(), expect.anything(), 0, 4);
 
     hnsw.searchKNN([3, 4, 5, 6, 7], 2, { efSearch: 3 });
-    expect(spy).toHaveBeenNthCalledWith(2, [3, 4, 5, 6, 7], expect.anything(), 0, 3);
+    expect(spy).toHaveBeenNthCalledWith(2, [3, 4, 5, 6, 7], expect.anything(), expect.anything(), 0, 3);
     spy.mockRestore();
   });
 

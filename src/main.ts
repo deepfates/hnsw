@@ -1,6 +1,6 @@
 import { BinaryHeap } from './heap';
 import { Node } from './node';
-import { cosineSimilarity, euclideanSimilarity } from './similarity';
+import { cosineSimilarity, cosineSimilarityFromNorms, euclideanSimilarity, norm } from './similarity';
 
 type Metric = 'cosine' | 'euclidean';
 type SearchCandidate = { node: Node; score: number };
@@ -44,6 +44,16 @@ export class HNSW {
     }
   }
 
+  // Score a query against a stored node. For cosine this reuses the node's
+  // cached norm (and the query norm computed once per search), so each
+  // comparison costs one dot product instead of three.
+  private similarityToNode(query: Float32Array | number[], queryNorm: number, node: Node): number {
+    if (this.metric === 'cosine') {
+      return cosineSimilarityFromNorms(query, node.vector, queryNorm, node.norm);
+    }
+    return this.similarityFunction(query, node.vector);
+  }
+
   private set_probs(M: number, levelMult: number): number[] {
     let level = 0;
     const probs = [];
@@ -68,9 +78,9 @@ export class HNSW {
     return this.probs.length - 1;
   }
 
-  private greedySearch(query: Float32Array | number[], entryNode: Node, level: number): Node {
+  private greedySearch(query: Float32Array | number[], queryNorm: number, entryNode: Node, level: number): Node {
     let bestNode = entryNode;
-    let bestScore = this.similarityFunction(query, entryNode.vector);
+    let bestScore = this.similarityToNode(query, queryNorm, entryNode);
     let improved = true;
 
     while (improved) {
@@ -78,7 +88,7 @@ export class HNSW {
       const neighbors = bestNode.neighbors[level] ?? [];
       for (const neighborId of neighbors) {
         const neighborNode = this.nodes.get(neighborId)!;
-        const similarity = this.similarityFunction(query, neighborNode.vector);
+        const similarity = this.similarityToNode(query, queryNorm, neighborNode);
         if (similarity > bestScore) {
           bestScore = similarity;
           bestNode = neighborNode;
@@ -90,12 +100,18 @@ export class HNSW {
     return bestNode;
   }
 
-  private searchLayer(query: Float32Array | number[], entryNode: Node, level: number, ef: number): Node[] {
+  private searchLayer(
+    query: Float32Array | number[],
+    queryNorm: number,
+    entryNode: Node,
+    level: number,
+    ef: number,
+  ): Node[] {
     const visited = new Set<number>([entryNode.id]);
     const candidates = new BinaryHeap<SearchCandidate>((a, b) => a.score - b.score);
     const best = new BinaryHeap<SearchCandidate>((a, b) => b.score - a.score);
 
-    const entryScore = this.similarityFunction(query, entryNode.vector);
+    const entryScore = this.similarityToNode(query, queryNorm, entryNode);
     candidates.push({ node: entryNode, score: entryScore });
     best.push({ node: entryNode, score: entryScore });
 
@@ -111,7 +127,7 @@ export class HNSW {
         if (visited.has(neighborId)) continue;
         visited.add(neighborId);
         const neighborNode = this.nodes.get(neighborId)!;
-        const score = this.similarityFunction(query, neighborNode.vector);
+        const score = this.similarityToNode(query, queryNorm, neighborNode);
         if (best.size < ef || score > (best.peek()?.score ?? -Infinity)) {
           candidates.push({ node: neighborNode, score });
           best.push({ node: neighborNode, score });
@@ -178,7 +194,7 @@ export class HNSW {
     const scored = Array.from(uniqueCandidates.values())
       .map((candidate) => ({
         node: candidate,
-        score: this.similarityFunction(node.vector, candidate.vector),
+        score: this.similarityToNode(node.vector, node.norm, candidate),
       }))
       .sort((a, b) => b.score - a.score);
 
@@ -188,7 +204,7 @@ export class HNSW {
         break;
       }
       const shouldSelect = selected.every((neighbor) => {
-        const neighborSimilarity = this.similarityFunction(entry.node.vector, neighbor.vector);
+        const neighborSimilarity = this.similarityToNode(entry.node.vector, entry.node.norm, neighbor);
         return neighborSimilarity <= entry.score;
       });
       if (shouldSelect) {
@@ -210,12 +226,12 @@ export class HNSW {
     let entryNode = this.nodes.get(this.entryPointId)!;
 
     for (let level = currentMaxLevel; level > node.level; level--) {
-      entryNode = this.greedySearch(node.vector, entryNode, level);
+      entryNode = this.greedySearch(node.vector, node.norm, entryNode, level);
     }
 
     const targetLevel = Math.min(node.level, currentMaxLevel);
     for (let level = targetLevel; level >= 0; level--) {
-      const neighbors = this.searchLayer(node.vector, entryNode, level, this.efConstruction);
+      const neighbors = this.searchLayer(node.vector, node.norm, entryNode, level, this.efConstruction);
       this.connectNodeAtLevel(node, neighbors, level);
       if (neighbors.length > 0) {
         entryNode = neighbors[0];
@@ -263,20 +279,21 @@ export class HNSW {
       throw new Error(`Query vector must have dimension ${this.d}, got ${query.length}`);
     }
 
+    const queryNorm = norm(query);
     let entryNode = this.nodes.get(this.entryPointId)!;
     for (let level = this.levelMax; level > 0; level--) {
-      entryNode = this.greedySearch(query, entryNode, level);
+      entryNode = this.greedySearch(query, queryNorm, entryNode, level);
     }
 
     const ef = Math.max(k, options?.efSearch ?? this.efSearch);
-    const candidates = this.searchLayer(query, entryNode, 0, ef);
+    const candidates = this.searchLayer(query, queryNorm, entryNode, 0, ef);
     const results: { id: number; score: number }[] = [];
     const seen = new Set<number>();
 
     for (const node of candidates) {
       if (seen.has(node.id)) continue;
       seen.add(node.id);
-      const score = this.similarityFunction(node.vector, query);
+      const score = this.similarityToNode(query, queryNorm, node);
       results.push({ id: node.id, score });
       if (results.length === k) {
         break;
