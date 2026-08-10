@@ -17,7 +17,7 @@ export function cosineSimilarity(a: Float32Array | number[], b: Float32Array | n
 
 // Cosine similarity when the vector norms are already known: a single dot
 // product instead of three. The hot path inside HNSW uses this with norms
-// cached at insert time.
+// computed at most once per vector within a single operation.
 export function cosineSimilarityFromNorms(
   a: Float32Array | number[],
   b: Float32Array | number[],
