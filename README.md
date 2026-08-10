@@ -120,6 +120,10 @@ Notes:
 - Increase `M` for tougher datasets when memory budget allows.
 - Keep `efSearch >= k` for better recall consistency.
 
+## Vector immutability
+
+Vectors must not be mutated after insertion; the index caches derived values. `addPoint`/`buildIndex` store your array by reference, and for the cosine metric each node's L2 norm is cached lazily on its first cosine use so every later comparison costs a single dot product. Mutating a vector after it has been inserted leaves any cached values stale: searches remain deterministic but may return stale scores and will not reflect the mutation. To change a vector, rebuild the index (or insert under a new id).
+
 ## Limitations
 
 - This implementation prioritizes simplicity over peak throughput and memory efficiency.

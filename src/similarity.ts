@@ -1,5 +1,5 @@
 // Note: Similarity functions
-function dotProduct(a: Float32Array | number[], b: Float32Array | number[]): number {
+export function dotProduct(a: Float32Array | number[], b: Float32Array | number[]): number {
   let dP = 0.0;
   for (let i = 0; i < a.length; i++) {
     dP += a[i] * b[i];
@@ -7,8 +7,25 @@ function dotProduct(a: Float32Array | number[], b: Float32Array | number[]): num
   return dP;
 }
 
+export function norm(a: Float32Array | number[]): number {
+  return Math.sqrt(dotProduct(a, a));
+}
+
 export function cosineSimilarity(a: Float32Array | number[], b: Float32Array | number[]): number {
-  const denominator = Math.sqrt(dotProduct(a, a)) * Math.sqrt(dotProduct(b, b));
+  return cosineSimilarityFromNorms(a, b, norm(a), norm(b));
+}
+
+// Cosine similarity when the vector norms are already known: a single dot
+// product instead of three. The hot path inside HNSW uses this with node
+// norms cached at insert time (vectors are immutable once inserted) and the
+// query norm computed once per operation.
+export function cosineSimilarityFromNorms(
+  a: Float32Array | number[],
+  b: Float32Array | number[],
+  normA: number,
+  normB: number,
+): number {
+  const denominator = normA * normB;
   if (denominator === 0) {
     return 0;
   }
