@@ -1,13 +1,13 @@
 import { BinaryHeap } from './heap';
-import { Node } from './node';
+import { Node, nodeNorm } from './node';
 import { cosineSimilarity, cosineSimilarityFromNorms, euclideanSimilarity, norm } from './similarity';
 
 type Metric = 'cosine' | 'euclidean';
 type SearchCandidate = { node: Node; score: number };
 
 // Cosine fast-path context: the norm of the vector being inserted or
-// searched, computed once per operation. Stored-node norms are cached on the
-// Node itself at insert time (see Node.norm), which is valid because vectors
+// searched, computed once per operation. Stored-node norms are cached in a
+// module-level WeakMap on first cosine use (see nodeNorm in node.ts), which is valid because vectors
 // are immutable once inserted — see README "Vector immutability".
 type CosineContext = { queryNorm: number };
 
@@ -64,7 +64,7 @@ export class HNSW {
   // Traversal scoring; pre-optimization operand order was (query, node.vector).
   private scoreQueryToNode(query: Float32Array | number[], node: Node, ctx: CosineContext | null): number {
     if (ctx) {
-      return cosineSimilarityFromNorms(query, node.vector, ctx.queryNorm, node.norm);
+      return cosineSimilarityFromNorms(query, node.vector, ctx.queryNorm, nodeNorm(node));
     }
     return this.similarityFunction(query, node.vector);
   }
@@ -72,7 +72,7 @@ export class HNSW {
   // Final result scoring; pre-optimization operand order was (node.vector, query).
   private scoreNodeToQuery(node: Node, query: Float32Array | number[], ctx: CosineContext | null): number {
     if (ctx) {
-      return cosineSimilarityFromNorms(node.vector, query, node.norm, ctx.queryNorm);
+      return cosineSimilarityFromNorms(node.vector, query, nodeNorm(node), ctx.queryNorm);
     }
     return this.similarityFunction(node.vector, query);
   }
@@ -80,7 +80,7 @@ export class HNSW {
   // Neighbor-selection scoring; pre-optimization operand order was (a.vector, b.vector).
   private scoreNodeToNode(a: Node, b: Node, ctx: CosineContext | null): number {
     if (ctx) {
-      return cosineSimilarityFromNorms(a.vector, b.vector, a.norm, b.norm);
+      return cosineSimilarityFromNorms(a.vector, b.vector, nodeNorm(a), nodeNorm(b));
     }
     return this.similarityFunction(a.vector, b.vector);
   }
@@ -263,7 +263,7 @@ export class HNSW {
       return;
     }
 
-    const ctx = this.cosineContext(node.vector, node.norm);
+    const ctx = this.cosineContext(node.vector, nodeNorm(node));
     const currentMaxLevel = this.levelMax;
     let entryNode = this.nodes.get(this.entryPointId)!;
 
