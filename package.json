@@ -11,6 +11,7 @@
     "url": "https://github.com/deepfates/hnsw.git"
   },
   "main": "dist/index.js",
+  "module": "dist/esm/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
@@ -21,7 +22,7 @@
   "scripts": {
     "test": "jest --config jestconfig.json",
     "test:coverage": "jest --config jestconfig.json --coverage --runInBand",
-    "build": "tsc",
+    "build": "tsc && tsc -p tsconfig.esm.json",
     "bench": "node dist/bench/run.js",
     "bench:download": "node dist/bench/download.js",
     "bench:report": "node dist/bench/report.js",

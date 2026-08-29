@@ -10,6 +10,7 @@ and this project adheres to Semantic Versioning.
 ### Added
 - Versioned binary serialization for transporting or statically hosting in-memory indexes. The format is bounds-checked on restore and supports lossless `float32` vectors or compact normalized `int16` vectors for cosine indexes.
 - An optional constructor random source for reproducible graph construction.
+- An ES-module build for browser bundlers, alongside the existing CommonJS entry point.
 
 ### Changed
 - Cosine comparisons now cost a single dot product: each node's L2 norm is cached lazily on first cosine use and the query norm is computed once per operation (~2.1x faster build+query measured on 10k x 384). This relies on a now-documented contract: vectors must not be mutated after insertion; the index caches derived values. Mutating a stored vector yields stale-but-stable scores. Euclidean and custom `similarityFunction` overrides are unaffected and take the original code path.
