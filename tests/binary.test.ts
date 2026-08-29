@@ -1,6 +1,16 @@
 import { deserializeHNSW, HNSW, serializeHNSW } from '../src';
 
 describe('binary persistence', () => {
+  function seededRandom(seed: number): () => number {
+    return () => {
+      seed |= 0;
+      seed = (seed + 0x6d2b79f5) | 0;
+      let value = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
+      return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
   async function example(): Promise<HNSW> {
     const index = new HNSW(8, 50, 3, 'cosine', 20);
     await index.buildIndex([
@@ -39,5 +49,17 @@ describe('binary persistence', () => {
     const corrupt = binary.slice();
     new DataView(corrupt.buffer).setUint32(32, 0xffffffff, true);
     expect(() => deserializeHNSW(corrupt)).toThrow('node count');
+  });
+
+  it('can build reproducible static indexes from a seeded random source', async () => {
+    const data = Array.from({ length: 50 }, (_, id) => ({
+      id,
+      vector: [Math.sin(id), Math.cos(id), id / 50],
+    }));
+    const first = new HNSW(8, 50, 3, 'cosine', 20, seededRandom(42));
+    const second = new HNSW(8, 50, 3, 'cosine', 20, seededRandom(42));
+    await first.buildIndex(data);
+    await second.buildIndex(data);
+    expect(serializeHNSW(first)).toEqual(serializeHNSW(second));
   });
 });

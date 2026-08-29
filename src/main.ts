@@ -22,11 +22,19 @@ export class HNSW {
   entryPointId: number; // Id of the entry point
   nodes: Map<number, Node>; // Map of nodes
   probs: number[]; // Probabilities for the levels
+  private readonly random: () => number;
 
   /**
    * Creates an in-memory HNSW index.
    */
-  constructor(M = 16, efConstruction = 200, d: number | null = null, metric = 'cosine', efSearch?: number) {
+  constructor(
+    M = 16,
+    efConstruction = 200,
+    d: number | null = null,
+    metric = 'cosine',
+    efSearch?: number,
+    random: () => number = () => Math.random(),
+  ) {
     this.metric = metric as Metric;
     this.d = d;
     this.M = M;
@@ -38,6 +46,7 @@ export class HNSW {
     this.probs = this.set_probs(M, 1 / Math.log(M));
     this.levelMax = -1;
     this.similarityFunction = this.getMetric(metric as Metric);
+    this.random = random;
   }
 
   private getMetric(metric: Metric): (a: number[] | Float32Array, b: number[] | Float32Array) => number {
@@ -98,7 +107,10 @@ export class HNSW {
   }
 
   private selectLevel(): number {
-    let r = Math.random();
+    let r = this.random();
+    if (!Number.isFinite(r) || r < 0 || r >= 1) {
+      throw new Error('Random source must return a finite number in [0, 1)');
+    }
     for (let i = 0; i < this.probs.length; i++) {
       const p = this.probs[i];
       if (r < p) {

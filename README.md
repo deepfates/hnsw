@@ -85,13 +85,14 @@ Notes:
 
 ## API Reference
 
-### `new HNSW(M, efConstruction, d?, metric?, efSearch?)`
+### `new HNSW(M, efConstruction, d?, metric?, efSearch?, random?)`
 
 - `M`: Max neighbors stored per node and layer. Higher values usually improve recall and memory cost.
 - `efConstruction`: Build-time exploration depth. Higher values improve index quality and build time cost.
 - `d`: Vector dimension. If omitted, inferred from first inserted vector.
 - `metric`: `cosine` or `euclidean`.
 - `efSearch`: Query-time exploration depth. Higher values improve recall and query latency cost.
+- `random`: Optional random source for reproducible graph construction. It must return values in `[0, 1)`.
 
 ### `buildIndex(data, options?)`
 
