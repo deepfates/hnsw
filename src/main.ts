@@ -1,6 +1,6 @@
-import { BinaryHeap } from './heap';
-import { Node, nodeNorm } from './node';
-import { cosineSimilarity, cosineSimilarityFromNorms, euclideanSimilarity, norm } from './similarity';
+import { BinaryHeap } from './heap.js';
+import { Node, nodeNorm } from './node.js';
+import { cosineSimilarity, cosineSimilarityFromNorms, euclideanSimilarity, norm } from './similarity.js';
 
 type Metric = 'cosine' | 'euclidean';
 type SearchCandidate = { node: Node; score: number };

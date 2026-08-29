@@ -1,6 +1,6 @@
-import { HNSW } from './main';
+import { HNSW } from './main.js';
 import { openDB, deleteDB, DBSchema, IDBPDatabase } from 'idb';
-import { cosineSimilarity, euclideanSimilarity } from './similarity';
+import { cosineSimilarity, euclideanSimilarity } from './similarity.js';
 
 type SerializedIndex = ReturnType<HNSW['toJSON']>;
 

@@ -45,6 +45,14 @@ const resultsWithEf = hnsw.searchKNN([6, 7, 8, 9, 10], 2, { efSearch: 100 });
 console.log(results);
 ```
 
+Static or worker-only consumers that do not need IndexedDB can use the portable
+entry. It excludes the database adapter and its `idb` dependency from the
+loaded module graph:
+
+```typescript
+import { HNSW, deserializeHNSW, serializeHNSW } from 'hnsw/portable';
+```
+
 Persistent index using IndexedDB:
 
 ```typescript

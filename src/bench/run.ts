@@ -1,10 +1,10 @@
 import { mkdir, writeFile } from 'fs/promises';
 import { basename, resolve } from 'path';
 import { performance } from 'perf_hooks';
-import { HNSW } from '../main';
-import { cosineSimilarity, euclideanSimilarity } from '../similarity';
-import { generateSyntheticDataset, loadFvecsDataset, Dataset, VectorRecord } from './dataset';
-import { bruteForceKNN, meanRecall, summarizeLatencies, recallAtK } from './metrics';
+import { HNSW } from '../main.js';
+import { cosineSimilarity, euclideanSimilarity } from '../similarity.js';
+import { generateSyntheticDataset, loadFvecsDataset, Dataset, VectorRecord } from './dataset.js';
+import { bruteForceKNN, meanRecall, summarizeLatencies, recallAtK } from './metrics.js';
 
 type Metric = 'cosine' | 'euclidean';
 

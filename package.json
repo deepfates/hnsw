@@ -13,6 +13,18 @@
   "main": "dist/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/index.js"
+    },
+    "./portable": {
+      "types": "./dist/portable.d.ts",
+      "import": "./dist/esm/portable.js",
+      "require": "./dist/portable.js"
+    }
+  },
   "files": [
     "dist",
     "README.md",
@@ -22,7 +34,7 @@
   "scripts": {
     "test": "jest --config jestconfig.json",
     "test:coverage": "jest --config jestconfig.json --coverage --runInBand",
-    "build": "tsc && tsc -p tsconfig.esm.json",
+    "build": "tsc && tsc -p tsconfig.esm.json && node scripts/write-esm-package.cjs",
     "bench": "node dist/bench/run.js",
     "bench:download": "node dist/bench/download.js",
     "bench:report": "node dist/bench/report.js",

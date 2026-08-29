@@ -18,7 +18,7 @@
 // identical graphs and identical result lists, bit for bit.
 
 import { createHash } from 'crypto';
-import { HNSW } from '../main';
+import { HNSW } from '../main.js';
 
 function mulberry32(seed: number) {
   return () => {

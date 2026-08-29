@@ -1,6 +1,6 @@
-import { HNSW } from './main';
-import { Node } from './node';
-import { norm } from './similarity';
+import { HNSW } from './main.js';
+import { Node } from './node.js';
+import { norm } from './similarity.js';
 
 const MAGIC = [0x48, 0x4e, 0x53, 0x57] as const; // HNSW
 const FORMAT_VERSION = 1;

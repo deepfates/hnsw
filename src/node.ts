@@ -1,4 +1,4 @@
-import { norm } from './similarity';
+import { norm } from './similarity.js';
 
 // Cached L2 norms, computed on first cosine use and reused for every later
 // comparison. Held in a module-level WeakMap rather than on Node so Node's

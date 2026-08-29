@@ -4,6 +4,9 @@
   },
   "testRegex": "(/tests/.*|(\\.|/))(test|spec)\\.(jsx?|tsx?)$",
   "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
+  "moduleNameMapper": {
+    "^(\\.{1,2}/.*)\\.js$": "$1"
+  },
   "coverageThreshold": {
     "global": {
       "branches": 65,
