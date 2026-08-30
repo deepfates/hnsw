@@ -51,6 +51,35 @@ describe('binary persistence', () => {
     expect(() => deserializeHNSW(corrupt)).toThrow('node count');
   });
 
+  it('round-trips a single node whose sampled level exceeds the node count', async () => {
+    const index = new HNSW(2, 20, 2, 'cosine', 10, () => 0.8);
+    await index.buildIndex([{ id: 7, vector: [1, 0] }]);
+    expect(index.nodes.get(7)?.level).toBe(2);
+
+    const restored = deserializeHNSW(serializeHNSW(index));
+    expect(restored.nodes.get(7)?.level).toBe(2);
+    expect(restored.searchKNN([1, 0], 1)).toEqual([{ id: 7, score: 1 }]);
+  });
+
+  it.each([
+    { offset: 12, value: 0, message: 'M' },
+    { offset: 16, value: 0, message: 'efConstruction' },
+    { offset: 20, value: 0, message: 'efSearch' },
+  ])('rejects malformed $message metadata', async ({ offset, value, message }) => {
+    const corrupt = serializeHNSW(await example()).slice();
+    new DataView(corrupt.buffer).setUint32(offset, value, true);
+    expect(() => deserializeHNSW(corrupt)).toThrow(message);
+  });
+
+  it.each(['M', 'efConstruction', 'efSearch'] as const)(
+    'rejects a mutated %s value that cannot be encoded as uint32',
+    async (parameter) => {
+      const index = await example();
+      index[parameter] = 0x100000000;
+      expect(() => serializeHNSW(index)).toThrow(parameter);
+    },
+  );
+
   it('can build reproducible static indexes from a seeded random source', async () => {
     const data = Array.from({ length: 50 }, (_, id) => ({
       id,

@@ -7,6 +7,7 @@ const FORMAT_VERSION = 1;
 const HEADER_BYTES = 36;
 const MAX_DIMENSIONS = 1_000_000;
 const MAX_NODES = 10_000_000;
+const MAX_UINT32 = 0xffffffff;
 
 export type VectorEncoding = 'float32' | 'int16';
 
@@ -31,6 +32,19 @@ function checkedSize(index: HNSW, bytesPerValue: number): number {
   }
   if (index.nodes.size > MAX_NODES) {
     throw new Error(`Cannot serialize more than ${MAX_NODES} nodes`);
+  }
+  if (!Number.isInteger(index.M) || index.M < 2 || index.M > MAX_UINT32) {
+    throw new Error('Cannot serialize invalid M');
+  }
+  if (
+    !Number.isInteger(index.efConstruction) ||
+    index.efConstruction < 1 ||
+    index.efConstruction > MAX_UINT32
+  ) {
+    throw new Error('Cannot serialize invalid efConstruction');
+  }
+  if (!Number.isInteger(index.efSearch) || index.efSearch < 1 || index.efSearch > MAX_UINT32) {
+    throw new Error('Cannot serialize invalid efSearch');
   }
 
   let size = HEADER_BYTES;
@@ -223,7 +237,6 @@ export function deserializeHNSW(data: ArrayBuffer | Uint8Array): HNSW {
     const level = reader.u16();
     reader.u16(); // reserved
     if (index.nodes.has(id)) throw new Error(`Duplicate HNSW node id ${id}`);
-    if (level > nodeCount) throw new Error(`Invalid HNSW level on node ${id}`);
     const vector = new Float32Array(dimensions);
     for (let dimension = 0; dimension < dimensions; dimension++) {
       vector[dimension] = vectorEncoding === 0 ? reader.f32() : reader.i16() / 32767;

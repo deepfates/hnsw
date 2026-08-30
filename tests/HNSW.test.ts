@@ -38,6 +38,17 @@ const buildBasicIndex = async (
 };
 
 describe('HNSW', () => {
+  it.each([
+    [1, 16, undefined, 'M'],
+    [0x100000000, 16, undefined, 'M'],
+    [4, 0, undefined, 'efConstruction'],
+    [4, 0x100000000, undefined, 'efConstruction'],
+    [4, 16, 0, 'efSearch'],
+    [4, 16, 0x100000000, 'efSearch'],
+  ] as const)('rejects invalid graph parameters', (M, efConstruction, efSearch, message) => {
+    expect(() => new HNSW(M, efConstruction, 2, 'cosine', efSearch)).toThrow(message);
+  });
+
   it('performs a basic KNN search with deterministic ordering', async () => {
     const levelSequence = Array(baseData.length).fill(0);
     const hnsw = await buildBasicIndex(baseData, { levelSequence });

@@ -4,6 +4,7 @@ import { cosineSimilarity, cosineSimilarityFromNorms, euclideanSimilarity, norm 
 
 type Metric = 'cosine' | 'euclidean';
 type SearchCandidate = { node: Node; score: number };
+const MAX_UINT32 = 0xffffffff;
 
 // Cosine fast-path context: the norm of the vector being inserted or
 // searched, computed once per operation. Stored-node norms are cached in a
@@ -35,12 +36,25 @@ export class HNSW {
     efSearch?: number,
     random: () => number = () => Math.random(),
   ) {
+    if (!Number.isInteger(M) || M < 2 || M > MAX_UINT32) {
+      throw new Error('M must be an integer between 2 and 4294967295');
+    }
+    if (!Number.isInteger(efConstruction) || efConstruction < 1 || efConstruction > MAX_UINT32) {
+      throw new Error('efConstruction must be an integer between 1 and 4294967295');
+    }
+    const resolvedEfSearch = efSearch ?? efConstruction;
+    if (!Number.isInteger(resolvedEfSearch) || resolvedEfSearch < 1 || resolvedEfSearch > MAX_UINT32) {
+      throw new Error('efSearch must be an integer between 1 and 4294967295');
+    }
+    if (d !== null && (!Number.isInteger(d) || d < 1)) {
+      throw new Error('Vector dimension must be a positive integer or null');
+    }
     this.metric = metric as Metric;
     this.d = d;
     this.M = M;
     this.efConstruction = efConstruction;
     // Default efSearch to efConstruction for backward compatibility
-    this.efSearch = efSearch ?? efConstruction;
+    this.efSearch = resolvedEfSearch;
     this.entryPointId = -1;
     this.nodes = new Map<number, Node>();
     this.probs = this.set_probs(M, 1 / Math.log(M));
